@@ -1,0 +1,224 @@
+<html>
+
+<body>
+	<p>Click to select, double click to cancel</p>
+	<select id="coord">
+		<option value="eq"> Equatorial </option>
+		<option value="gal"> Galactic </option>
+	</select>
+
+	<button onclick = "update(nside16)">Nside=16</button>
+	<button onclick="update(nside64)">Nside=64</button>
+
+	<div id="plot"></div>
+	<p>Selected pixId: <p>
+	<div id="info"></div>
+	
+</body>
+</html>
+
+<!-- Load d3.js-->
+
+<script src="https://d3js.org/d3.v5.min.js"></script>
+<script src="https://d3js.org/d3-geo.v1.min.js"></script>
+<script src="https://d3js.org/d3-geo-projection.v2.min.js"></script>
+
+
+<script type="text/javascript">
+var margin = {top:50, bottom:50, right:50, left:50};
+var width = 1000 - margin.left - margin.right;
+var height = 600 - margin.top - margin.bottom;
+
+//append svg
+var svg = d3.select("#plot")
+			.append("svg")
+			.attr("width", width + margin.left + margin.right)
+			.attr("height", height + margin.top + margin.bottom)
+			//.style("background-color", "rgba(128, 255, 128, 0.1)")
+			.style("background-color", "white")
+			.append("g")
+			.attr("transform", "translate("+margin.left+", "+margin.top+")")
+
+// add axis
+var x = d3.scaleLinear()
+			.domain([0, 360])
+			.range([0, width]);
+
+svg.append("g")
+	.attr("transform", "translate(0, "+height+")")
+	.call(d3.axisBottom(x));
+
+var y = d3.scaleLinear()
+			.domain([-90, 90])
+			.range([height, 0]);
+
+svg.append("g")
+	.attr("transform", "translate(0, 0)")
+	.call(d3.axisLeft(y));
+
+var cmap = d3.scaleSequential(d3.interpolateSpectral).domain([1000000, 0])
+
+var tooltip = d3.select("body").append("div")
+    .style("position", "absolute")
+    .style("z-index", "10")
+    .style("visibility", "hidden")
+    .style("background", "white" )
+    .style("opacity", 0.6)
+
+ // mouseover function
+ var mouseover = function(d) {
+	//console.log( proj( [-d.fieldRa, d.fieldDec] ) )
+	  d3.select(this)
+        .style("stroke", "black")
+        .style("stroke-opacity", 1)
+        //.style("opacity", 1)
+        .attr("r", 2)
+        .style("cursor", "default")
+
+    tooltip.style("visibility", "visible")
+    		.text([d.fieldRa, d.fieldDec, d.starDensity_r25, d.pixId])
+  }
+
+var mousemove = function(d){
+	tooltip.style("top", (d3.event.pageY-10)+"px")
+	 	   .style("left",(d3.event.pageX+10)+"px");
+
+// d3.event.pageX/Y  is the current mouse coordinate
+}
+
+// mouseleave 
+var mouseleave = function(d){
+	d3.select(this)
+	 .style("stroke", "none")
+	//	.style("opacity", 0.5)
+		.attr("r", 2)
+
+	tooltip.style("visibility", "hidden")
+
+}
+
+var click = function(d){
+	console.log( [ d.pixId] )
+    //console.log ( proj( [-d.fieldRa, d.fieldDec] ) )
+	d3.select(this)
+		.style("stroke", "black")
+		.style("opacity", 0.9)
+
+	arr.push(d.pixId)
+	arr =  Array.from(new Set(arr))
+	svg2txt.text(arr)
+}
+
+var dblclick = function(d){
+	console.log( [d.pixId] )
+
+	d3.select(this)
+		.style("opacity", 0.3)
+
+	var idx = arr.indexOf( d.pixId)
+	if (idx!=-1){
+		arr.splice( idx, 1) }; // remove double clicked pix
+
+	svg2txt.text(arr)
+}
+
+// projection
+var proj = d3.geoMollweide().scale(160)
+
+var nside16 = "./data/Fields_nside16.csv"
+var nside64 = "./data/Fields_nside64.csv"
+
+//get coordinate option
+
+// Add dots
+
+function update(fields){
+arr = []
+svg2txt.text(arr)
+var coord = document.querySelector("#coord").value
+
+// read csv file
+var data = d3.csv(fields).then( function(data){
+
+console.log(data[0])
+console.log(data[0].starDensity_r25)
+var scatter = svg.selectAll("circle").remove(scatter)
+
+svg.selectAll("circle")
+  .data(data)
+  .enter()
+  .append("circle")
+  .attr("class", "skymap")
+    .attr("cx", function (d) { 
+
+    	if (coord=="eq"){   
+    		var projx = proj( [-d.fieldRa, d.fieldDec] )[0];
+    		xLabel.text("RA");
+    		}
+
+    	else {
+    		var projx = proj( [-d.fieldGl, d.fieldGb] )[0];
+    		xLabel.text("Gl");
+    	}
+
+    	var newx = changeMinMax(projx, 25, 930, 0, 360);
+    	return   x(newx); } ) 
+    .attr("cy", function (d) { 
+
+       if (coord=="eq"){   
+    		var projy = proj( [-d.fieldRa, d.fieldDec] )[1];
+    		yLabel.text("Dec"); }
+
+    	else {
+    		var projy = proj( [-d.fieldGl, d.fieldGb] )[1];
+    	    yLabel.text("Gb");}
+
+    	var newy = - changeMinMax(projy, 20, 480, -90, 90);
+    	return   y( newy ); } ) 
+    .attr("r", 2)
+    .style("opacity", 0.3)
+    .style("fill", function(d){return cmap(d.starDensity_r25)})
+    .on("mouseover", mouseover)
+    .on("mousemove", mousemove)
+    .on("mouseleave", mouseleave)
+    .on("click", click)
+    .on("dblclick", dblclick)
+
+})
+}
+
+var changeMinMax = function(oldValue, oldMin, oldMax, newMin, newMax){
+
+	var oldRange = oldMax - oldMin;
+	var newRange = newMax - newMin;
+
+	var newValue = ((oldValue - oldMin) * newRange / oldRange) + newMin; 
+
+	return newValue; 
+}
+	
+// add label
+var xLabel = svg.append("text")
+	.attr("x", width/2)
+	.attr("y", height + margin.top/2)
+	.text("RA");
+
+var yLabel = svg.append("text")
+	.attr("transform", "rotate(-90)")
+	.attr("y", -margin.left+20)
+	.attr("x", -height/2)
+	.text("DEC")
+
+// text to show selected pix
+svg2txt = d3.select("#info")
+  			.append("textarea")
+  			.attr("rows", 5)
+  			.attr("cols", 120)
+  			.attr("disabled", true)
+  			.style("background-color", "rgba(128, 255, 128, 0.1)")
+
+var arr = []
+update(nside16)
+
+</script>
+
