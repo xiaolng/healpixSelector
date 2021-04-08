@@ -1,0 +1,308 @@
+<html>
+
+<style >
+.button {
+  position: relative;
+  background-color: #4CAF50;
+  border: none;
+  font-size: 18px;
+  color: #FFFFFF;
+  padding: 12px;
+  width: 200px;
+  text-align: center;
+  transition-duration: 0.4s;
+  text-decoration: none;
+  overflow: hidden;
+  cursor: pointer;
+}
+.button:after {
+  content: "";
+  background: #f1f1f1;
+  display: block;
+  position: absolute;
+  padding-top: 300%;
+  padding-left: 350%;
+  margin-left: -20px !important;
+  margin-top: -120%;
+  opacity: 0;
+  transition: all 1.2s
+}
+
+.button:active:after {
+  padding: 0;
+  margin: 0;
+  opacity: 1;
+  transition: 0s
+}
+</style>
+
+<body>
+	<h1>Star Density Map</h1>
+	<p>Click to select, double click to cancel</p>
+	<select id="mapname">
+		<option value="star"> starDensity </option>
+		<option value="tri"> TRIstarDensity </option>
+	</select>
+
+	<select id="coord">
+		<option value="eq"> Equatorial </option>
+		<option value="gal"> Galactic </option>
+	</select>
+
+	<select id="nside">
+		<option value="16"> nside=16 </option>
+		<option value="64"> nside=64 </option>
+	</select>
+
+	<div class="slider item">
+      <div class="label">colormap scale </div>
+      <div><span class="low">0</span> <input type="range" id='cmaxslider' name="scale" min="3.5" max="8" step='0.1' value="6"> <span>10000000 stars/sq deg</span></div>
+    </div>
+
+	<button class="button" onclick = "update()">Update</button>
+
+	<div id="plot"></div>
+	<p>Selected pixIds: <p>
+	<div id="info"></div>
+	
+</body>
+
+</html>
+
+<!-- Load d3.js-->
+
+<script src="https://d3js.org/d3.v5.min.js"></script>
+<script src="https://d3js.org/d3-geo.v1.min.js"></script>
+<script src="https://d3js.org/d3-geo-projection.v2.min.js"></script>
+
+
+<script type="text/javascript">
+var margin = {top:50, bottom:50, right:50, left:50};
+var width = 1000 - margin.left - margin.right;
+var height = 600 - margin.top - margin.bottom;
+
+//append svg
+var svg = d3.select("#plot")
+			.append("svg")
+			.attr("width", width + margin.left + margin.right)
+			.attr("height", height + margin.top + margin.bottom)
+			//.style("background-color", "rgba(128, 255, 128, 0.1)")
+			.style("background-color", "white")
+			.append("g")
+			.attr("transform", "translate("+margin.left+", "+margin.top+")")
+
+// add axis
+var x = d3.scaleLinear()
+			.domain([0, 360])
+			.range([0, width]);
+
+svg.append("g")
+	.attr("transform", "translate(0, "+height+")")
+	.call(d3.axisBottom(x));
+
+var y = d3.scaleLinear()
+			.domain([-90, 90])
+			.range([height, 0]);
+
+svg.append("g")
+	.attr("transform", "translate(0, 0)")
+	.call(d3.axisLeft(y));
+
+//var cmap = d3.scaleSequential(d3.interpolateSpectral).domain([1000000, 0])
+
+var cmap = d3.scaleSequential().domain([0, 1000000,]).interpolator(d3.interpolateViridis);
+
+var tooltip = d3.select("body").append("div")
+    .style("position", "absolute")
+    .style("z-index", "10")
+    .style("visibility", "hidden")
+    .style("background", "white" )
+    .style("opacity", 0.6)
+
+ // mouseover function
+ var mouseover = function(d) {
+	//console.log( proj( [-d.fieldRa, d.fieldDec] ) )
+	  d3.select(this)
+        .style("stroke", "black")
+        .style("stroke-opacity", 1)
+        //.style("opacity", 1)
+        //.attr("r", 5)
+        .style("cursor", "default")
+
+    tooltip.style("visibility", "visible")
+    		.text([d.pixId, d.fieldRa, d.fieldDec, d.starDensity_r25, d.TRIstarDensity_r25])
+  }
+
+var mousemove = function(d){
+	tooltip.style("top", (d3.event.pageY-10)+"px")
+	 	   .style("left",(d3.event.pageX+10)+"px");
+
+// d3.event.pageX/Y  is the current mouse coordinate
+}
+
+// mouseleave 
+var mouseleave = function(d){
+	d3.select(this)
+	 .style("stroke", "none")
+	//	.style("opacity", 0.5)
+		//.attr("r", 2)
+
+	tooltip.style("visibility", "hidden")
+
+}
+
+var click = function(d){
+	console.log( [ d.pixId] )
+    //console.log ( proj( [-d.fieldRa, d.fieldDec] ) )
+	d3.select(this)
+		.style("stroke", "black")
+		.style("opacity", 0.9)
+
+	arr.push(d.pixId)
+	arr =  Array.from(new Set(arr))
+	svg2txt.text(arr)
+}
+
+var dblclick = function(d){
+	console.log( [d.pixId] )
+
+	d3.select(this)
+		.style("opacity", 0.3)
+
+	var idx = arr.indexOf( d.pixId)
+	if (idx!=-1){
+		arr.splice( idx, 1) }; // remove double clicked pix
+
+	svg2txt.text(arr)
+}
+
+// projection
+//var proj = d3.geoMollweide().scale(160)
+var proj = d3.geoMollweide().scale(156).rotate([0,0]).translate([width/2, height/2])
+//var proj = d3.geoConicEqualArea().scale(160)
+var nside16 = "./data/Fields_nside16.csv"
+var nside64 = "./data/Fields_nside64.csv"
+
+//get coordinate option
+
+// Add dots
+
+function update(){
+		arr = []
+		svg2txt.text(arr)
+		var coord = document.querySelector("#coord").value
+		var mapname = document.querySelector("#mapname").value
+		var nside = document.querySelector("#nside").value
+		
+		if (nside==64){
+			fields = nside64
+		
+			var cr = 2}
+		else {fields = nside16
+			var cr = 5}
+		
+		// update cmap
+		var cmax = document.querySelector("#cmaxslider").value
+		console.log('cmax' + cmax)
+		//cmap.domain([cmax, 0])
+
+		cmap.domain([0, Math.pow(10, cmax)])
+		
+		// read csv file
+		var data = d3.csv(fields).then( function(data){
+		
+		console.log(data[0])
+		console.log(data[0].starDensity_r25)
+		console.log(data[0].TRIstarDensity_r25)
+		
+		var scatter = svg.selectAll("circle").remove(scatter)
+		
+		svg.selectAll("circle")
+		  .data(data)
+		  .enter()
+		  .append("circle")
+		  .attr("class", "skymap")
+		    .attr("cx", function (d) { 
+		
+		    	if (coord=="eq"){   
+		    		var projx = proj( [-d.fieldRa, d.fieldDec] )[0];
+		    		xLabel.text("RA");
+		    		}
+		
+		    	else {
+		    		var projx = proj( [-d.fieldGl, d.fieldGb] )[0];
+		    		xLabel.text("Gl");
+		    	}
+		
+		    	//var newx = changeMinMax(projx, 25, 930, 0, 360);
+		    	//return   x(newx); 
+		    	return projx
+		
+		    	} ) 
+		    .attr("cy", function (d) { 
+		
+		       if (coord=="eq"){   
+		    		var projy = proj( [-d.fieldRa, d.fieldDec] )[1];
+		    		yLabel.text("Dec"); }
+		
+		    	else {
+		    		var projy = proj( [-d.fieldGl, d.fieldGb] )[1];
+		    	    yLabel.text("Gb");}
+		
+		    	//var newy = - changeMinMax(projy, 20, 480, -90, 90);
+		
+		    	//var newy = projy
+		    	//return   y( newy ); 
+		    	return projy
+		    } ) 
+		    .attr("r", cr)
+		    .style("opacity", 0.5)
+		    .style("fill", function(d){
+		    	if (mapname=="tri"){
+		    			return cmap( d.TRIstarDensity_r25) }
+		    	else{
+		    			return cmap( d.starDensity_r25 )  }
+		    })
+		    .on("mouseover", mouseover)
+		    .on("mousemove", mousemove)
+		    .on("mouseleave", mouseleave)
+		    .on("click", click)
+		    .on("dblclick", dblclick)
+		
+		})
+}
+
+//var changeMinMax = function(oldValue, oldMin, oldMax, newMin, newMax){
+	// change value of variables to new range;
+//	var oldRange = oldMax - oldMin;
+//	var newRange = newMax - newMin;
+
+//	var newValue = ((oldValue - oldMin) * newRange / oldRange) + newMin; 
+//	return newValue; 
+//}
+	
+// add label
+var xLabel = svg.append("text")
+	.attr("x", width/2)
+	.attr("y", height + margin.top/2)
+	.text("RA");
+
+var yLabel = svg.append("text")
+	.attr("transform", "rotate(-90)")
+	.attr("y", -margin.left+20)
+	.attr("x", -height/2)
+	.text("DEC")
+
+// text to show selected pix
+svg2txt = d3.select("#info")
+  			.append("textarea")
+  			.attr("rows", 5)
+  			.attr("cols", 120)
+  			.attr("disabled", true)
+  			.style("background-color", "rgba(128, 255, 128, 0.1)")
+
+var arr = []
+//update(nside16)
+update()
+</script>
+
