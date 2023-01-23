@@ -33,6 +33,7 @@ Visit jupyter notebook [spatial_selection.ipynb](https://github.com/xiaolng/heal
 To select the HEALPix ID visit interactive [skymap](https://xiaolng.github.io/healpixSelector/skymap2.html).
 
 ![](figures/healpixselect.png "")
+
 Healpixel-based selection of sky areas: convex, concave, and hollow regions can be selected on multiple spatial projections
 
 
@@ -41,7 +42,8 @@ Healpixel-based selection of sky areas: convex, concave, and hollow regions can 
 
 
 ## References
-[HEALPix: A Framework for High-Resolution Discretization and Fast Analysis of Data Distributed on the Sphere](https://doi.org/10.1086/427976)
-
 [Preparing to Discover the Unknown with Rubin LSST: Time Domain](https://doi.org/10.3847/1538-4365/ac3bca)
+
+
+[HEALPix: A Framework for High-Resolution Discretization and Fast Analysis of Data Distributed on the Sphere](https://doi.org/10.1086/427976)
 
